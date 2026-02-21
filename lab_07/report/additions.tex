@@ -1,0 +1,863 @@
+\ssr{Приложение А}
+
+
+\begin{lstlisting}[label=lst:kimi_ans_2, caption=Ответ БЯМ Kimi K2 2, commentstyle=\empty]
+import re
+from PyPDF2 import PdfReader
+
+def check_pdf_structure_errors(file_path):
+    """
+    Проверяет PDF на наличие подразделов в разделах ВВЕДЕНИЕ и ЗАКЛЮЧЕНИЕ.
+    Возвращает: (bool, [(найденная_строка, (номер_страницы, номер_строки))])
+    """
+    # Регулярное выражение:
+    # ^\s* - начало текста страницы с возможными пробелами
+    # (?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ) - поиск ключевых слов
+    # [\s\S]*? - любой текст (включая переносы строк), ленивый поиск
+    # \d+\.\d+ - поиск числового паттерна подраздела (напр. 1.1)
+    regex_pattern = r"^\s*(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\b[\s\S]*?\d+\.\d+"
+
+    errors = []
+
+    try:
+        reader = PdfReader(file_path)
+
+        for page_idx, page in enumerate(reader.pages, start=1):
+            text = page.extract_text()
+            if not text:
+                continue
+
+            # Ищем вхождение регулярного выражения на странице
+            match = re.search(regex_pattern, text)
+
+            if match:
+                matched_str = match.group()
+                # Определяем номер строки: считаем переходы строк перед найденным вхождением
+                # Индексация строк обычно начинается с 1
+                line_offset = text[:match.start()].count('\n') + 1
+
+                # Добавляем в список: (строка, (страница, строка))
+                errors.append((matched_str, (page_idx, line_offset)))
+
+    except Exception as e:
+        print(f"Ошибка при чтении файла: {e}")
+        return (False, [])
+
+    # Возвращаем кортеж (Статус ошибки, Список координат)
+    return (len(errors) > 0, errors)
+
+# Пример использования:
+# has_error, details = check_pdf_structure_errors("document.pdf")
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:kimi_ans_3, caption=Ответ БЯМ Kimi K2 3, commentstyle=\empty]
+import re
+import os
+import sys
+from PyPDF2 import PdfReader
+
+def check_pdf_structure_errors(file_path):
+    """
+    Проверяет PDF на наличие подразделов в разделах ВВЕДЕНИЕ и ЗАКЛЮЧЕНИЕ.
+    Возвращает: (bool, [(найденная_строка, (номер_страницы, номер_строки))])
+    """
+    # Регулярное выражение для поиска ошибки
+    regex_pattern = r"^\s*(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\b[\s\S]*?\d+\.\d+"
+    errors = []
+
+    try:
+        reader = PdfReader(file_path)
+        for page_idx, page in enumerate(reader.pages, start=1):
+            text = page.extract_text()
+            if not text:
+                continue
+
+            # Поиск вхождения
+            match = re.search(regex_pattern, text)
+            if match:
+                matched_str = match.group().strip()
+                # Считаем строку: количество переносов строк до совпадения + 1
+                line_number = text[:match.start()].count('\n') + 1
+                errors.append((matched_str, (page_idx, line_number)))
+
+    except Exception as e:
+        print(f"[!] Ошибка при обработке файла: {e}")
+        return (False, [])
+
+    return (len(errors) > 0, errors)
+
+def run_software():
+    """Основная логика работы программы."""
+    print("=== Проверка структуры PDF (Введение/Заключение) ===")
+
+    # Получение пути к файлу от пользователя (через аргументы или ввод)
+    if len(sys.argv) > 1:
+        file_path = sys.argv[1]
+    else:
+        file_path = input("Введите путь к PDF-файлу: ").strip().strip('"')
+
+    # Проверка существования файла
+    if not os.path.exists(file_path):
+        print(f"Ошибка: Файл по пути '{file_path}' не найден.")
+        return
+
+    if not file_path.lower().endswith('.pdf'):
+        print("Ошибка: Выбранный файл не является форматом PDF.")
+        return
+
+    print(f"Анализ файла: {os.path.basename(file_path)}...")
+
+    # Вызов функции анализа
+    has_errors, error_list = check_pdf_structure_errors(file_path)
+
+    # Вывод результатов
+    if has_errors:
+        print("\n[РЕЗУЛЬТАТ] Найдены ошибки структуры:")
+        print("-" * 50)
+        for i, (text_fragment, coords) in enumerate(error_list, 1):
+            page, line = coords
+            # Ограничиваем вывод фрагмента текста для читаемости
+            preview_text = text_fragment.replace('\n', ' ')[:60] + "..."
+            print(f"{i}. Ошибка на СТР. {page}, СТРОКА {line}")
+            print(f"   Фрагмент: \"{preview_text}\"")
+        print("-" * 50)
+        print(f"Всего нарушений: {len(error_list)}")
+    else:
+        print("\n[РЕЗУЛЬТАТ] Ошибок не обнаружено. Структура разделов ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ корректна.")
+
+if __name__ == "__main__":
+    run_software()
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:kimi_ans_4, caption=Ответ БЯМ Kimi K2 4, commentstyle=\empty]
+import re
+from PyPDF2 import PdfReader
+
+def check_pdf_structure_errors(file_path):
+    # Паттерн с использованием (?m) для многострочного поиска
+    # Ищет ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ как отдельную строку,
+    # а затем ищет подраздел (1.1), который тоже начинается с новой строки.
+    regex_pattern = r"(?m)^\s*(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$[\s\S]*?^\d+\.\d+"
+
+    errors = []
+
+    try:
+        reader = PdfReader(file_path)
+        for page_idx, page in enumerate(reader.pages, start=1):
+            text = page.extract_text()
+            if not text:
+                continue
+
+            # Поиск вхождения
+            match = re.search(regex_pattern, text)
+
+            if match:
+                matched_str = match.group().strip()
+                # Считаем строку: количество \n до начала совпадения + 1
+                line_offset = text[:match.start()].count('\n') + 1
+                errors.append((matched_str, (page_idx, line_offset)))
+
+    except Exception as e:
+        return (False, f"Ошибка при чтении: {e}")
+
+    return (len(errors) > 0, errors)
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:kimi_ans_5, caption=Ответ БЯМ Kimi K2 5, commentstyle=\empty]
+import re
+import os
+import sys
+from PyPDF2 import PdfReader
+
+def check_pdf_structure_errors(file_path):
+    """
+    Проверяет PDF на наличие подразделов в разделах ВВЕДЕНИЕ и ЗАКЛЮЧЕНИЕ.
+    Учитывает регистр заголовков и проверяет, что предполагаемый подраздел
+    действительно является заголовком (начинается с заглавной буквы).
+    """
+
+    # (?mi) - флаги (multiline + case insensitive)
+    # ^\s*(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$ - строка, содержащая только заголовок раздела
+    # [\s\S]*? - любой текст далее
+    # ^\s*\d+\.\d+\.?\s+[А-ЯЁA-Z] - новая строка, начинающаяся с "Число.Число",
+    # за которым обязательно следует Заглавная буква (признак заголовка).
+    regex_pattern = r"(?mi)^\s*(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$[\s\S]*?^\s*\d+\.\d+\.?\s+[А-ЯЁA-Z]"
+
+    errors = []
+
+    try:
+        reader = PdfReader(file_path)
+        for page_idx, page in enumerate(reader.pages, start=1):
+            text = page.extract_text()
+            if not text:
+                continue
+
+            # Поиск вхождения
+            match = re.search(regex_pattern, text)
+
+            if match:
+                # Нам нужно найти именно ту часть, которая вызвала ошибку (подраздел)
+                # match.group() вернет огромный кусок текста от ВВЕДЕНИЯ до ошибки.
+                # Поэтому мы найдем последнюю строку в этом совпадении, которая похожа на подраздел.
+
+                full_match = match.group()
+
+                # Ищем внутри совпадения конкретную строку с ошибкой (1.1 ...)
+                # Это нужно для красивого вывода, так как match захватит весь текст от заголовка
+                error_pattern = r"^\s*\d+\.\d+\.?\s+[А-ЯЁA-Z]"
+                sub_matches = list(re.finditer(error_pattern, full_match, re.MULTILINE))
+
+                if sub_matches:
+                    # Берем последнее совпадение (оно и стриггерило конец regex)
+                    last_sub_match = sub_matches[-1]
+                    matched_str = last_sub_match.group().strip()
+
+                    # Вычисляем глобальное смещение для точного определения строки
+                    global_start = match.start() + last_sub_match.start()
+                    line_number = text[:global_start].count('\n') + 1
+
+                    errors.append((matched_str, (page_idx, line_number)))
+
+    except Exception as e:
+        print(f"Ошибка при обработке: {e}")
+        return (False, [])
+
+    return (len(errors) > 0, errors)
+
+# --- Блок запуска для проверки ---
+if __name__ == "__main__":
+    print("=== Проверка структуры PDF ===")
+    if len(sys.argv) > 1:
+        fpath = sys.argv[1]
+    else:
+        fpath = input("Введите путь к файлу: ").strip().strip('"')
+
+    if os.path.exists(fpath):
+        is_error, details = check_pdf_structure_errors(fpath)
+        if is_error:
+            print("\n[!] НАЙДЕНЫ ОШИБКИ:")
+            for txt, (pg, ln) in details:
+                print(f"   Стр {pg}, строка {ln}: найдет подраздел '{txt}' в запрещенной секции.")
+        else:
+            print("\n[OK] Ошибок не найдено.")
+    else:
+        print("Файл не найден.")
+\end{lstlisting}
+
+
+\begin{lstlisting}[label=lst:deepseek_ans_2, caption=Ответ БЯМ DeepSeek V3.2 2, commentstyle=\empty]
+import re
+from PyPDF2 import PdfReader
+
+def check_pdf_structure(file_path):
+    """
+    Ищет подразделы в разделах ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ.
+    Возвращает: (bool, [(matched_text, (page_num, line_num)), ...])
+    """
+    # Регулярное выражение из предыдущего ответа
+    pattern = re.compile(r'(?im)^(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)[\s\S]*?^\d+\.\d+\s+[А-ЯЁA-Z]')
+
+    results = []
+
+    try:
+        reader = PdfReader(file_path)
+
+        for page_index, page in enumerate(reader.pages):
+            text = page.extract_text()
+            if not text:
+                continue
+
+            # Ищем все вхождения на текущей странице
+            for match in pattern.finditer(text):
+                matched_str = match.group(0)
+
+                # Определяем номер строки: считаем количество \n до начала совпадения + 1
+                start_pos = match.start()
+                line_number = text[:start_pos].count('\n') + 1
+
+                # Добавляем в результаты (текст ошибки, (номер страницы, номер строки))
+                # page_index + 1, так как индекс в массиве начинается с 0
+                results.append((matched_str, (page_index + 1, line_number)))
+
+    except Exception as e:
+        print(f"Ошибка при чтении файла: {e}")
+        return False, []
+
+    is_found = len(results) > 0
+    return is_found, results
+
+# Пример использования:
+# found, errors = check_pdf_structure("document.pdf")
+# if found:
+#     for text, coords in errors:
+#         print(f"Ошибка найдена на стр. {coords[0]}, строка {coords[1]}")
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:deepseek_ans_3, caption=Ответ БЯМ DeepSeek V3.2 3, commentstyle=\empty]
+import re
+import os
+import sys
+from PyPDF2 import PdfReader
+
+def check_pdf_structure(file_path):
+    """
+    Ищет подразделы в разделах ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ.
+    Возвращает: (bool, [(matched_text, (page_num, line_num)), ...])
+    """
+    # Регулярное выражение: ищет ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ в начале строки,
+    # за которым (через любые символы) следует число.число и Заглавная буква в начале строки
+    pattern = re.compile(r'(?im)^(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)[\s\S]*?^\d+\.\d+\s+[А-ЯЁA-Z]')
+
+    results = []
+
+    try:
+        reader = PdfReader(file_path)
+        for page_index, page in enumerate(reader.pages):
+            text = page.extract_text()
+            if not text:
+                continue
+
+            for match in pattern.finditer(text):
+                matched_str = match.group(0).strip()
+
+                # Вычисляем номер строки
+                start_pos = match.start()
+                line_number = text[:start_pos].count('\n') + 1
+
+                results.append((matched_str, (page_index + 1, line_number)))
+
+    except Exception as e:
+        print(f"[!] Ошибка при обработке PDF: {e}")
+        return False, []
+
+    return len(results) > 0, results
+
+def main():
+    # Проверка аргументов командной строки
+    if len(sys.argv) < 2:
+        path = input("Введите путь к PDF-файлу: ").strip('"')
+    else:
+        path = sys.argv[1]
+
+    # Проверка существования файла
+    if not os.path.exists(path):
+        print(f"Ошибка: Файл по адресу '{path}' не найден.")
+        return
+
+    if not path.lower().endswith('.pdf'):
+        print("Ошибка: Указанный файл не является PDF.")
+        return
+
+    print(f"--- Анализ файла: {os.path.basename(path)} ---")
+
+    is_error, details = check_pdf_structure(path)
+
+    if is_error:
+        print(f"СТАТУС: Найдено ошибок: {len(details)}")
+        print("-" * 30)
+        for i, (text, coords) in enumerate(details, 1):
+            page, line = coords
+            print(f"Ошибка {i}:")
+            print(f"  Страница: {page}")
+            print(f"  Строка:   {line}")
+            # Выводим только фрагмент с найденным подразделом для краткости
+            sub_section = text.split('\n')[-1]
+            print(f"  Найдено нарушение: \"{sub_section}\"")
+            print("-" * 30)
+    else:
+        print("СТАТУС: Ошибок в структуре 'ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ' не обнаружено.")
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:deepseek_ans_4, caption=Ответ БЯМ DeepSeek V3.2 4, commentstyle=\empty]
+import re
+import os
+import sys
+from PyPDF2 import PdfReader
+
+def check_pdf_structure(file_path):
+    """
+    Ищет подразделы (1.1, 2.3 и т.д.) в разделах ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ.
+    Условие: заголовок ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ должен быть единственным словом в строке.
+    """
+    # ^\s*(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$  - строго одна строка с заголовком
+    # [\s\S]*?                        - любые символы (включая переносы) до первого совпадения
+    # ^\d+\.\d+\s+[А-ЯЁA-Z]           - подраздел в начале строки: цифра.цифра, пробел и заглавная буква
+    pattern = re.compile(r'(?im)^\s*(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$[\s\S]*?^\d+\.\d+\s+[А-ЯЁA-Z]')
+
+    results = []
+
+    try:
+        reader = PdfReader(file_path)
+        for page_index, page in enumerate(reader.pages):
+            text = page.extract_text()
+            if not text:
+                continue
+
+            for match in pattern.finditer(text):
+                matched_str = match.group(0).strip()
+
+                # Вычисляем номер строки в тексте страницы
+                start_pos = match.start()
+                line_number = text[:start_pos].count('\n') + 1
+
+                # Извлекаем конкретную строку, которая нарушила правило (последняя строка совпадения)
+                lines = matched_str.split('\n')
+                error_line_text = lines[-1].strip()
+
+                results.append((error_line_text, (page_index + 1, line_number + len(lines) - 1)))
+
+    except Exception as e:
+        return False, f"Ошибка при обработке файла: {e}"
+
+    return len(results) > 0, results
+
+def main():
+    # Работа с аргументами или ручной ввод
+    if len(sys.argv) < 2:
+        path = input("Введите путь к PDF-файлу: ").strip('"')
+    else:
+        path = sys.argv[1]
+
+    if not os.path.exists(path):
+        print(f"Файл '{path}' не найден.")
+        return
+
+    print(f"Проверка: {os.path.basename(path)}...")
+
+    is_invalid, details = check_pdf_structure(path)
+
+    if isinstance(details, str): # Обработка ошибки чтения
+        print(details)
+        return
+
+    if is_invalid:
+        print("\n[!] ОШИБКА СТРУКТУРЫ: В разделе Введение/Заключение найдены подразделы.")
+        print("-" * 50)
+        for error_text, coords in details:
+            print(f"Страница {coords[0]}, Строка {coords[1]}:")
+            print(f" Нарушение: {error_text}")
+            print("-" * 50)
+    else:
+        print("\n[OK] Проверка пройдена. Ошибок структуры не обнаружено.")
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:deepseek_ans_5, caption=Ответ БЯМ DeepSeek V3.2 5, commentstyle=\empty]
+import re
+import os
+import sys
+from PyPDF2 import PdfReader
+
+def check_pdf_structure(file_path):
+    """
+    Ищет подразделы в разделах ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ.
+    Проверяет, что после числа и пробела идет строго заглавная буква.
+    """
+    # (?m) - многострочный режим
+    # ^\s*(?i:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$ - заголовок (регистр не важен)
+    # [\s\S]*? - любой текст между
+    # ^\s*\d+\.\d+ - число.число в начале строки
+    # [^\S\r\n]+ - только горизонтальные пробелы (не перенос строки!)
+    # [А-ЯЁA-Z] - строго заглавная буква
+    pattern = re.compile(r'(?m)^\s*(?i:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$[\s\S]*?^\s*\d+\.\d+[^\S\r\n]+[А-ЯЁA-Z]')
+
+    results = []
+
+    try:
+        reader = PdfReader(file_path)
+        for page_index, page in enumerate(reader.pages):
+            text = page.extract_text()
+            if not text:
+                continue
+
+            for match in pattern.finditer(text):
+                full_match_text = match.group(0).strip()
+
+                # Находим позицию начала подразделения внутри найденного куска текста
+                # Чтобы точно указать строку, где встретилось "1.1 Название"
+                error_match = re.search(r'^\s*\d+\.\d+[^\S\r\n]+[А-ЯЁA-Z]', full_match_text, re.MULTILINE)
+
+                if error_match:
+                    start_pos_in_page = match.start() + error_match.start()
+                    line_number = text[:start_pos_in_page].count('\n') + 1
+                    error_line = error_match.group(0).strip()
+
+                    results.append((error_line, (page_index + 1, line_number)))
+
+    except Exception as e:
+        return False, f"Ошибка при обработке файла: {e}"
+
+    return len(results) > 0, results
+
+def main():
+    if len(sys.argv) < 2:
+        path = input("Введите путь к PDF-файлу: ").strip('"')
+    else:
+        path = sys.argv[1]
+
+    if not os.path.exists(path):
+        print(f"Файл '{path}' не найден.")
+        return
+
+    is_invalid, details = check_pdf_structure(path)
+
+    if isinstance(details, str):
+        print(details)
+        return
+
+    if is_invalid:
+        print(f"\n[!] ОБНАРУЖЕНО НАРУШЕНИЕ: В Введении или Заключении найдены подразделы.")
+        for error_text, coords in details:
+            print(f"Стр {coords[0]}, Строка {coords[1]}: Найдено '{error_text}'")
+    else:
+        print("\n[OK] Ошибок не обнаружено. Числа внутри предложений (например, '1.2 раза') проигнорированы.")
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+
+\begin{lstlisting}[label=lst:glm_ans_2, caption=Ответ БЯМ GLM-4.6 2, commentstyle=\empty]
+import re
+from pypdf import PdfReader
+
+def check_structure_errors(pdf_path):
+    # Регулярное выражение из предыдущего ответа
+    # Находит "ВВЕДЕНИЕ" или "ЗАКЛЮЧЕНИЕ", если за ним на этой же странице идет подраздел (число.число)
+    regex_pattern = r'(?im)^\s*(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$(?=[\s\S]*?^\s*\d+\.\d+\s*[А-ЯЁA-Z])'
+
+    found_errors = []
+
+    try:
+        reader = PdfReader(pdf_path)
+    except Exception as e:
+        print(f"Ошибка при открытии файла: {e}")
+        return (False, [])
+
+    for page_num, page in enumerate(reader.pages, start=1):
+        text = page.extract_text()
+        if not text:
+            continue
+
+        # Поиск всех вхождений на странице
+        # Используем finditer, чтобы получить позиции совпадений для расчета строк
+        matches = re.finditer(regex_pattern, text)
+
+        for match in matches:
+            matched_str = match.group().strip()
+            # Определяем номер строки: считаем количество переносов строк до начала совпадения
+            start_pos = match.start()
+            line_num = text[:start_pos].count('\n') + 1
+
+            found_errors.append((
+                matched_str,
+                (page_num, line_num)
+            ))
+
+    is_found = len(found_errors) > 0
+    return (is_found, found_errors)
+
+# Пример использования:
+# result = check_structure_errors("document.pdf")
+# print(result)
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:glm_ans_3, caption=Ответ БЯМ GLM-4.6 3, commentstyle=\empty]
+import os
+import re
+import sys
+import argparse
+from pypdf import PdfReader
+
+def check_structure_errors(pdf_path):
+    """
+    Ищет ошибки структуры в PDF: наличие подразделов в разделах ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ.
+    Возвращает: (bool, [(строка, (стр, лин)), ...])
+    """
+    # Регулярное выражение:
+    # 1. Находит заголовок раздела (ВВЕДЕНИЕ или ЗАКЛЮЧЕНИЕ) как отдельную строку.
+    # 2. С помощью Lookahead (?=...) проверяет наличие ниже по тексту паттерна X.X ЗаглавнаяБуква
+    regex_pattern = r'(?im)^\s*(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$(?=[\s\S]*?^\s*\d+\.\d+\s*[А-ЯЁA-Z])'
+
+    found_errors = []
+
+    try:
+        reader = PdfReader(pdf_path)
+    except Exception as e:
+        # В случае критической ошибки открытия возвращаем кортеж согласно формату
+        return (False, [])
+
+    for page_num, page in enumerate(reader.pages, start=1):
+        text = page.extract_text()
+        if not text:
+            continue
+
+        # Поиск совпадений
+        matches = re.finditer(regex_pattern, text)
+
+        for match in matches:
+            matched_str = match.group().strip()
+            # Вычисляем номер строки
+            start_pos = match.start()
+            line_num = text[:start_pos].count('\n') + 1
+
+            found_errors.append((
+                matched_str,
+                (page_num, line_num)
+            ))
+
+    return (len(found_errors) > 0, found_errors)
+
+def main():
+    # Настройка парсера аргументов командной строки
+    parser = argparse.ArgumentParser(
+        description="ПО для проверки структуры PDF (поиск подразделов во Введении/Заключении)."
+    )
+    parser.add_argument("path", help="Путь к PDF-файлу")
+
+    args = parser.parse_args()
+    file_path = args.path
+
+    # Проверка существования файла
+    if not os.path.exists(file_path):
+        print(f"Ошибка: Файл по адресу '{file_path}' не найден.")
+        sys.exit(1)
+
+    if not file_path.lower().endswith('.pdf'):
+        print("Ошибка: Указанный файл не является PDF.")
+        sys.exit(1)
+
+    print(f"--- Анализ файла: {os.path.basename(file_path)} ---")
+
+    # Вызов основной функции
+    is_error_found, errors_list = check_structure_errors(file_path)
+
+    # Вывод результатов в консоль
+    if is_error_found:
+        print(f"СТАТУС: Ошибка структуры обнаружена!\n")
+        print(f"{'Найдено слово':<20} | {'Страница':<10} | {'Строка':<10}")
+        print("-" * 45)
+        for item in errors_list:
+            word = item[0]
+            page, line = item[1]
+            print(f"{word:<20} | {page:<10} | {line:<10}")
+    else:
+        print("СТАТУС: Ошибок структуры не обнаружено.")
+
+    # Также выводим сырой кортеж согласно требованию задания
+    print(f"\nРезультат функции (кортеж):")
+    print((is_error_found, errors_list))
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:glm_ans_4, caption=Ответ БЯМ GLM-4.6 4, commentstyle=\empty]
+import re
+import os
+import sys
+import argparse
+from PyPDF2 import PdfReader
+
+def check_structure_errors(pdf_path):
+    """
+    Функция для поиска подразделов в разделах ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ.
+    Использует PyPDF2 для извлечения текста.
+    """
+    # Регулярное выражение:
+    # (?im) - флаги (многострочность, игнорирование регистра)
+    # ^\s*(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$ - строка, содержащая только заголовок
+    # (?=[\s\S]*?^\s*\d+\.\d+\s*[А-ЯЁA-Z]) - проверка, что дальше есть паттерн подраздела (число.число)
+    regex_pattern = r'(?im)^\s*(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$(?=[\s\S]*?^\s*\d+\.\d+\s*[А-ЯЁA-Z])'
+
+    found_errors = []
+
+    try:
+        reader = PdfReader(pdf_path)
+    except Exception as e:
+        # Если файл не открывается или поврежден
+        return (False, [])
+
+    for page_num, page in enumerate(reader.pages, start=1):
+        # Извлекаем текст (в PyPDF2 метод extract_text() хорошо сохраняет структуру строк)
+        text = page.extract_text()
+
+        if not text:
+            continue
+
+        # Поиск всех вхождений регулярного выражения на странице
+        matches = re.finditer(regex_pattern, text)
+
+        for match in matches:
+            matched_str = match.group().strip()
+            # Индекс начала найденного вхождения
+            start_index = match.start()
+            # Определяем номер строки: считаем переходы на новую строку перед найденным текстом
+            line_num = text[:start_index].count('\n') + 1
+
+            found_errors.append((
+                matched_str,
+                (page_num, line_num)
+            ))
+
+    is_found = len(found_errors) > 0
+    return (is_found, found_errors)
+
+def main():
+    parser = argparse.ArgumentParser(description="Поиск ошибок разбиения Введения/Заключения в PDF (PyPDF2)")
+    parser.add_argument("file", help="Путь к PDF-файлу")
+    args = parser.parse_args()
+
+    if not os.path.exists(args.file):
+        print(f"Файл {args.file} не найден.")
+        return
+
+    # Получаем результат работы функции
+    result = check_structure_errors(args.file)
+
+    # Вывод согласно заданию
+    status, details = result
+
+    print("-" * 30)
+    print(f"Результат проверки: {status}")
+    print(f"Найденные ошибки: {details}")
+    print("-" * 30)
+
+    if status:
+        print("Детальный отчет:")
+        for entry in details:
+            print(f"- Ошибка в заголовке '{entry[0]}' на стр. {entry[1][0]}, строка {entry[1][1]}")
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:glm_ans_5, caption=Ответ БЯМ GLM-4.6 5, commentstyle=\empty]
+import re
+import os
+from PyPDF2 import PdfReader
+
+def check_structure_errors(pdf_path):
+    """
+    Проверяет, нет ли в разделах ВВЕДЕНИЕ/ЗАКЛЮЧЕНИЕ подразделов (число.число + Заглавная буква).
+    Возвращает: (bool, [(найденная_строка, (номер_страницы, номер_строки)), ...])
+    """
+    # Исправленное регулярное выражение
+    regex_pattern = r'(?m)^\s*(?i:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$(?=[\s\S]*?^\s*\d+\.\d+\s*[А-ЯЁA-Z])'
+
+    found_errors = []
+
+    if not os.path.exists(pdf_path):
+        return (False, [])
+
+    try:
+        reader = PdfReader(pdf_path)
+        for page_num, page in enumerate(reader.pages, start=1):
+            text = page.extract_text()
+            if not text:
+                continue
+
+            # Ищем совпадения на текущей странице
+            for match in re.finditer(regex_pattern, text):
+                matched_str = match.group().strip()
+
+                # Считаем номер строки
+                start_pos = match.start()
+                line_num = text[:start_pos].count('\n') + 1
+
+                found_errors.append((
+                    matched_str,
+                    (page_num, line_num)
+                ))
+
+    except Exception as e:
+        print(f"Ошибка при обработке файла: {e}")
+        return (False, [])
+
+    return (len(found_errors) > 0, found_errors)
+
+def main():
+    import sys
+    if len(sys.argv) < 2:
+        print("Использование: python script.py <путь_к_pdf>")
+        return
+
+    path = sys.argv[1]
+    result = check_structure_errors(path)
+
+    print(f"Результат: {result}")
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:glm_ans_6, caption=Ответ БЯМ GLM-4.6 6, commentstyle=\empty]
+import re
+import os
+import sys
+from PyPDF2 import PdfReader
+
+def check_structure_errors(pdf_path):
+    """
+    Ищет подразделы внутри ВВЕДЕНИЯ/ЗАКЛЮЧЕНИЯ.
+    Возвращает координаты строки с подразделом (X.X).
+    """
+    # Регулярное выражение с захватом строки подраздела в группу 1
+    regex_pattern = r'(?sm)^\s*(?i:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ)\s*$.*?(^\s*\d+\.\d+\s*[А-ЯЁA-Z].*)$'
+
+    found_errors = []
+
+    if not os.path.exists(pdf_path):
+        return (False, [])
+
+    try:
+        reader = PdfReader(pdf_path)
+        for page_num, page in enumerate(reader.pages, start=1):
+            text = page.extract_text()
+            if not text:
+                continue
+
+            # Используем finditer для нахождения всех ошибочных подразделов на странице
+            for match in re.finditer(regex_pattern, text):
+                # Текст самого подраздела (группа 1)
+                error_line_text = match.group(1).strip()
+
+                # Позиция начала подраздела в тексте страницы
+                start_pos_of_error = match.start(1)
+
+                # Вычисляем номер строки, где находится подраздел
+                line_num = text[:start_pos_of_error].count('\n') + 1
+
+                found_errors.append((
+                    error_line_text,
+                    (page_num, line_num)
+                ))
+
+    except Exception as e:
+        print(f"Ошибка при чтении PDF: {e}")
+        return (False, [])
+
+    return (len(found_errors) > 0, found_errors)
+
+def main():
+    if len(sys.argv) < 2:
+        print("Запуск: python script.py <путь_к_файлу.pdf>")
+        return
+
+    file_path = sys.argv[1]
+    is_error, details = check_structure_errors(file_path)
+
+    print(f"Наличие ошибки: {is_error}")
+    if is_error:
+        print("Список ошибок (Строка подраздела, (Страница, Номер строки)):")
+        for error in details:
+            print(error)
+
+if __name__ == "__main__":
+    main()
+\end{lstlisting}

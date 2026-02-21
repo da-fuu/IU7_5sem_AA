@@ -1,0 +1,45 @@
+\ssr{Приложение А}
+
+\begin{lstlisting}[label=vinograd_opt_lst, caption=Реализация оптимизированного алгоритма Винограда]
+int multiply_vinograd_opt(matrix_t matrix_in_1, matrix_t matrix_in_2, matrix_t matrix_out) {
+  size_t M = matrix_out.rows;
+  size_t N = matrix_in_1.cols;
+  size_t K = matrix_out.cols;
+  if (matrix_in_1.cols != matrix_in_2.rows)
+    return ERR_DIMENSIONS_MULTIPLY;
+  double *row_array = malloc(sizeof(double) * M);
+  if (row_array == NULL)
+    return ERR_NO_MEMORY;
+  double *col_array = malloc(sizeof(double) * K);
+  if (col_array == NULL)
+    return ERR_NO_MEMORY;
+  size_t half_N = N / 2;
+  for (size_t i = 0; i < M; i++) {
+    row_array[i] = 0;
+    for (size_t j = 0; j < half_N; j++)
+      row_array[i] = row_array[i] + matrix_in_1.elements[i][(j << 1)] * matrix_in_1.elements[i][(j << 1) + 1];
+  }
+  for (size_t i = 0; i < K; i++) {
+    col_array[i] = 0;
+    for (size_t j = 0; j < half_N; j++)
+      col_array[i] = col_array[i] + matrix_in_2.elements[(j << 1)][i] * matrix_in_2.elements[(j << 1) + 1][i];
+  }
+  for (size_t i = 0; i < M; i++) {
+    for (size_t j = 0; j < K; j++) {
+      matrix_out.elements[i][j] = -row_array[i] - col_array[j];
+      for (size_t k = 0; k < half_N; k++) {
+        matrix_out.elements[i][j] = matrix_out.elements[i][j] + (matrix_in_1.elements[i][(k << 1)] + matrix_in_2.elements[(k << 1) + 1][j]) * (matrix_in_1.elements[i][(k << 1) + 1] + matrix_in_2.elements[(k << 1)][j]);
+      }
+    }
+  }
+  if (N % 2 == 1) {
+    size_t N_minus_1 = N - 1;
+    for (size_t i = 0; i < M; i++)
+      for (size_t j = 0; j < K; j++)
+        matrix_out.elements[i][j] = matrix_out.elements[i][j] + matrix_in_1.elements[i][N_minus_1] * matrix_in_2.elements[N_minus_1][j];
+  }
+  free(row_array);
+  free(col_array);
+  return OK;
+}
+\end{lstlisting}

@@ -1,0 +1,148 @@
+\chapter{Технологическая часть}
+
+\section{Средства реализации}
+
+Для реализации алгоритмов был выбран язык \texttt{C++} (стандарт C++20). Для замера реального времени используется стандартная библиотека \texttt{chrono}~\cite{chrono}. Для работы с семафорами используется заголовочный файл \texttt{semaphore.h}~\cite{sem}. Для создания потоков используется стандартная библиотека \texttt{thread}~\cite{thread}.
+
+Для работы с сущностью вспомогательного потока необходимо соблюдать следующий порядок:
+\begin{itemize}
+	\item создать и запустить поток с помощью создания объекта класса \texttt{std::thread};
+	\item при создании в конструктор передать первым аргументом функцию, которую начнёт исполнять создаваемый поток, дальнейшие аргументы будут переданы данной функции;
+	\item ожидать завершения потока с помощью метода \texttt{join}.
+\end{itemize}
+
+\section{Реализации алгоритмов}
+
+В листинге~\ref{seq_lst} представлен исходный код реализации последовательного алгоритма поиска в графе вершин с количеством связей большим или меньшим, чем входной параметр.
+
+\begin{lstlisting}[label=seq_lst, caption=Реализация последовательного алгоритма поиска в графе вершин с необходимым количеством связей]
+void solveSequential(const Graph &g, int k, CompareMode mode, int activeVertices, std::vector<int> &resultVector) {
+  resultVector.clear();
+  const auto *in_ptr = g.in_edges.data();
+  const auto *out_ptr = g.out_edges.data();
+  size_t k_sz = static_cast<size_t>(k);
+  if (mode == MODE_GREATER) {
+    for (int i = 0; i < activeVertices; ++i) {
+      if (in_ptr[i].size() + out_ptr[i].size() > k_sz) {
+        resultVector.push_back(i);
+      }
+    }
+  } else {
+    for (int i = 0; i < activeVertices; ++i) {
+      if (in_ptr[i].size() + out_ptr[i].size() < k_sz) {
+        resultVector.push_back(i);
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+В листинге~\ref{par_main_lst} представлен исходный код реализации главного потока параллельного алгоритма поиска в графе вершин с количеством связей большим или меньшим, чем входной параметр.
+
+\begin{lstlisting}[label=par_main_lst, caption=Реализация главного потока параллельного алгоритма поиска в графе вершин с необходимым количеством связей]
+void solveParallel(const Graph &g, int k, CompareMode mode, int numThreads, int activeVertices, std::vector<int> &resultVector) {
+  resultVector.clear();
+  SharedContext ctx(numThreads);
+  ctx.graph = &g;
+  ctx.K = k;
+  ctx.mode = mode;
+  ctx.resultVector = &resultVector;
+  std::vector<std::thread> threads;
+  threads.reserve(numThreads);
+  int chunkSize = activeVertices / numThreads;
+  int remainder = activeVertices % numThreads;
+  int start = 0;
+
+  for (int i = 0; i < numThreads; ++i) {
+    int end = start + chunkSize + (i < remainder ? 1 : 0);
+    threads.emplace_back(workerThread, std::ref(ctx), i, start, end);
+    start = end;
+  }
+
+  for (int i = 0; i < numThreads; ++i)
+    sem_wait(&ctx.semFinishedStage1);
+
+  int totalFound = 0;
+  for (int i = 0; i < numThreads; ++i) {
+    ctx.tData[i].offset = totalFound;
+    totalFound += ctx.tData[i].count;
+  }
+  resultVector.resize(totalFound);
+
+  for (int i = 0; i < numThreads; ++i)
+    sem_post(&ctx.semStartStage2);
+  for (auto &t : threads)
+    t.join();
+}
+\end{lstlisting}
+
+В листинге~\ref{par_help_lst} представлен исходный код реализации вспомогательного потока параллельного алгоритма поиска в графе вершин с количеством связей большим или меньшим, чем входной параметр.
+
+\begin{lstlisting}[label=par_help_lst, caption=Реализация вспомогательного потока параллельного алгоритма поиска в графе вершин с необходимым количеством связей]
+void workerThread(SharedContext &ctx, int threadId, int startIdx, int endIdx) {
+  const auto *in_ptr = ctx.graph->in_edges.data();
+  const auto *out_ptr = ctx.graph->out_edges.data();
+  int localCount = 0;
+  size_t k_sz = static_cast<size_t>(ctx.K);
+  if (ctx.mode == MODE_GREATER) {
+    for (int i = startIdx; i < endIdx; ++i) {
+      if (in_ptr[i].size() + out_ptr[i].size() > k_sz)
+        localCount++;
+    }
+  } else {
+    for (int i = startIdx; i < endIdx; ++i) {
+      if (in_ptr[i].size() + out_ptr[i].size() < k_sz)
+        localCount++;
+    }
+  }
+  ctx.tData[threadId].count = localCount;
+  sem_post(&ctx.semFinishedStage1);
+  sem_wait(&ctx.semStartStage2);
+  int writeIndex = ctx.tData[threadId].offset;
+  int *res_raw_ptr = ctx.resultVector->data();
+  if (ctx.mode == MODE_GREATER) {
+    for (int i = startIdx; i < endIdx; ++i) {
+      if (in_ptr[i].size() + out_ptr[i].size() > k_sz) {
+        res_raw_ptr[writeIndex++] = i;
+      }
+    }
+  } else {
+    for (int i = startIdx; i < endIdx; ++i) {
+      if (in_ptr[i].size() + out_ptr[i].size() < k_sz) {
+        res_raw_ptr[writeIndex++] = i;
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+
+\section{Функциональные тесты}
+
+В таблице~\ref{tab:func_tests} представлены функциональные тесты для алгоритмов поиска в графе вершин с количеством связей большим или меньшим, чем входной параметр.
+
+Введены обозначения для описания графа: $N$ --- количество вершин, список пар $(u, v)$ обозначает наличие дуги из вершины $u$ в вершину $v$.
+
+\begin{table}[h]
+	\caption{Таблица функционального тестирования реализаций алгоритма}
+	\label{tab:func_tests}
+	\centering
+	\begin{tabular}{|p{0.35\linewidth}|p{0.2\linewidth}|p{0.2\linewidth}|c|}
+		\hline
+		Граф                                                 & Запрос       & Ожидаемый результат \\
+		\hline
+		$N=4$. Дуги: $(0, 1)$, $(0, 2)$, $(1, 0)$.           & Связей $> 2$ & $\{0\}$             \\
+		\hline
+		$N=5$. Дуги: $(0, 1)$.                               & Связей $< 1$ & $\{2, 3, 4\}$       \\
+		\hline
+		$N=3$. Дуги: $(0, 1)$, $(1, 2)$, $(2, 3)$, $(3, 0)$. & Связей $> 5$ & $\emptyset$ (пусто) \\
+		\hline
+	\end{tabular}
+\end{table}
+
+Все тесты пройдены успешно для реализаций последовательного и параллельного алгоритмов.
+
+
+\section*{Вывод}
+
+В технологической части определены необходимые средства реализации, и с их помощью реализованы последовательный и параллельный алгоритмы поиска в графе вершин с количеством связей большим или меньшим, чем входной параметр, описаны функциональные тесты.

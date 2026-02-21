@@ -1,0 +1,118 @@
+\chapter{Технологическая часть}
+
+\section{Средства реализации}
+
+Для реализации алгоритмов был выбран язык \texttt{C}. Для измерения процессорного времени процесса используется функция \texttt{clock}~\cite{clock} из заголовочного файла \texttt{time.h}. Для построения графиков используется утилита \texttt{gnuplot}.
+
+\section{Реализации алгоритмов}
+
+В листинге~\ref{std_lst} представлен исходный код реализации стандартного алгоритма умножения матриц.
+
+\begin{lstlisting}[label=std_lst, caption=Реализация стандартного алгоритма умножения матриц]
+int multiply_std(matrix_t matrix_in_1, matrix_t matrix_in_2, matrix_t matrix_out) {
+  if (matrix_in_1.cols != matrix_in_2.rows)
+    return ERR_DIMENSIONS_MULTIPLY;
+  for (size_t i = 0; i < matrix_out.rows; i++)
+    for (size_t j = 0; j < matrix_out.cols; j++) {
+      matrix_out.elements[i][j] = 0;
+      for (size_t k = 0; k < matrix_in_1.cols; k++)
+        matrix_out.elements[i][j] = matrix_out.elements[i][j] +  matrix_in_1.elements[i][k] * matrix_in_2.elements[k][j];
+    }
+  return OK;
+}
+\end{lstlisting}
+
+В листинге~\ref{vinograd_lst} представлен исходный код реализации алгоритма Винограда.
+
+\begin{lstlisting}[label=vinograd_lst, caption=Реализация алгоритма Винограда]
+int multiply_vinograd(matrix_t matrix_in_1, matrix_t matrix_in_2, matrix_t matrix_out) {
+  size_t M = matrix_out.rows;
+  size_t N = matrix_in_1.cols;
+  size_t K = matrix_out.cols;
+  if (matrix_in_1.cols != matrix_in_2.rows)
+    return ERR_DIMENSIONS_MULTIPLY;
+  double *row_array = malloc(sizeof(double) * M);
+  if (row_array == NULL)
+    return ERR_NO_MEMORY;
+  double *col_array = malloc(sizeof(double) * K);
+  if (col_array == NULL)
+    return ERR_NO_MEMORY;
+  for (size_t i = 0; i < M; i++) {
+    row_array[i] = 0;
+    for (size_t j = 0; j < N / 2; j++)
+      row_array[i] = row_array[i] + matrix_in_1.elements[i][2 * j] * matrix_in_1.elements[i][2 * j + 1];
+  }
+  for (size_t i = 0; i < K; i++) {
+    col_array[i] = 0;
+    for (size_t j = 0; j < N / 2; j++)
+      col_array[i] = col_array[i] + matrix_in_2.elements[2 * j][i] * matrix_in_2.elements[2 * j + 1][i];
+  }
+  for (size_t i = 0; i < M; i++) {
+    for (size_t j = 0; j < K; j++) {
+      matrix_out.elements[i][j] = -row_array[i] - col_array[j];
+      for (size_t k = 0; k < N / 2; k++) {
+        matrix_out.elements[i][j] = matrix_out.elements[i][j] + (matrix_in_1.elements[i][2 * k] + matrix_in_2.elements[2 * k + 1][j]) * (matrix_in_1.elements[i][2 * k + 1] + matrix_in_2.elements[2 * k][j]);
+      }
+    }
+  }
+  if (N % 2 == 1) {
+    for (size_t i = 0; i < M; i++)
+      for (size_t j = 0; j < K; j++)
+        matrix_out.elements[i][j] = matrix_out.elements[i][j] + matrix_in_1.elements[i][N - 1] * matrix_in_2.elements[N - 1][j];
+  }
+  free(row_array);
+  free(col_array);
+  return OK;
+}
+
+\end{lstlisting}
+
+Исходный код реализации оптимизированного алгоритма Винограда представлен в Приложении А в листинге~\ref{vinograd_opt_lst}.
+
+\section{Функциональные тесты}
+В таблице~\ref{tests_table} представлены данные и результаты тестирования реализаций алгоритмов умножения матриц.
+\begin{table}[H]
+  \captionsetup{justification=raggedright,singlelinecheck=off}
+  \caption{Функциональные тесты для реализации алгоритмов умножения матриц}
+  \label{tests_table}
+  \begin{center}
+    \resizebox{\textwidth}{!}{\begin{tabular}{|c|c|c|c|}
+        \hline
+        Матрица 1 & Матрица 2 & Ожидаемый результат & Фактический результат \\
+        \hline
+        $\begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix}$ &
+        $\begin{pmatrix} 7 \end{pmatrix}$ &
+        Сообщение об ошибке &
+        Некорректные измерения \\
+        \hline
+        $\begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix}$ &
+        $\begin{pmatrix} & \end{pmatrix}$ &
+        Сообщение об ошибке &
+        Некорректные измерения \\
+        \hline
+        $\begin{pmatrix} 2 & 2 & 2 \\ 2 & 2 & 2 \\ 2 & 2 & 2 \end{pmatrix}$ &
+        $\begin{pmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{pmatrix}$ &
+        $\begin{pmatrix} 2 & 2 & 2 \\ 2 & 2 & 2 \\ 2 & 2 & 2 \end{pmatrix}$ &
+        $\begin{pmatrix} 2 & 2 & 2 \\ 2 & 2 & 2 \\ 2 & 2 & 2 \end{pmatrix}$ \\
+        \hline
+        $\begin{pmatrix} 1 \\ 2 \\ 3 \end{pmatrix}$ &
+        $\begin{pmatrix} 1 & 2 & 3 \end{pmatrix}$ &
+        $\begin{pmatrix} 1 & 2 & 3 \\ 2 & 4 & 6 \\ 3 & 6 & 9 \end{pmatrix}$ &
+        $\begin{pmatrix} 1 & 2 & 3 \\ 2 & 4 & 6 \\ 3 & 6 & 9 \end{pmatrix}$ \\
+        \hline
+        $\begin{pmatrix} 1 & 2 & 3 \end{pmatrix}$ &
+        $\begin{pmatrix} 1 \\ 2 \\ 3 \end{pmatrix}$ &
+        $\begin{pmatrix} 14 \end{pmatrix}$ &
+        $\begin{pmatrix} 14 \end{pmatrix}$ \\
+        \hline
+    \end{tabular}}
+  \end{center}
+\end{table}
+
+Все тесты пройдены успешно для всех трёх функций, реализующих рассматриваемые алгоритмы.
+
+\section*{Вывод}
+
+В технологической части определены необходимые средства реализации, и с их помощью реализованы алгоритмы умножения матриц. Успешно проведено функциональное тестирование реализаций алгоритмов.
+
+\clearpage
