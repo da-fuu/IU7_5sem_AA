@@ -28,11 +28,12 @@ double calc_avg_rec(int *array, long long *sum, size_t *len) {
   (*len)++;
   if (*array == 0) {
     avg = (double)*sum / (double)*len;
-    return avg;
   }
-  *sum += *array;
-  array++;
-  avg = calc_avg_rec(array, sum, len);
+  else {
+    *sum += *array;
+    array++;
+    avg = calc_avg_rec(array, sum, len);
+  }
   return avg;
 }
 \end{lstlisting}
